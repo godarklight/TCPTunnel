@@ -19,12 +19,12 @@ public class UDPTunnel
     //1MB token buffer
     public long tokensMax = 1024 * 1024;
 
-    public UDPTunnel(NetworkHandler networkHandler, int listenPort)
+    public UDPTunnel(NetworkHandler networkHandler, Settings settings)
     {
         this.networkHandler = networkHandler;
         udpc = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp);
         udpc.DualMode = true;
-        udpc.Bind(new IPEndPoint(IPAddress.IPv6Any, listenPort));
+        udpc.Bind(new IPEndPoint(IPAddress.IPv6Any, settings.listenPort));
         readThread = new Thread(new ThreadStart(ReadLoop));
         readThread.Start();
         writeThread = new Thread(new ThreadStart(WriteLoop));

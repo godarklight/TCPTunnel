@@ -16,15 +16,15 @@ public class TunnelClient
     private ConcurrentDictionary<int, TcpClient> clients = new ConcurrentDictionary<int, TcpClient>();
     private Thread networkLoop;
 
-    public TunnelClient(NetworkHandler networkHandler, IPEndPoint endpoint, int listenPort)
+    public TunnelClient(NetworkHandler networkHandler, Settings settings)
     {
 
         this.networkHandler = networkHandler;
-        this.serverEndpoint = endpoint;
+        this.serverEndpoint = settings.ipEndpoint;
         networkHandler.SetClient(this);
         networkLoop = new Thread(new ThreadStart(NetworkLoop));
         networkLoop.Start();
-        listener = new TcpListener(new IPEndPoint(IPAddress.IPv6Any, listenPort));
+        listener = new TcpListener(new IPEndPoint(IPAddress.IPv6Any, settings.listenPort));
         listener.Server.DualMode = true;
         listener.Start();
         listener.BeginAcceptTcpClient(HandleConnect, null);

@@ -14,10 +14,10 @@ public class TunnelServer
     private Thread networkLoop;
     private IPEndPoint connectEndpoint;
 
-    public TunnelServer(NetworkHandler networkHandler, IPEndPoint endPoint)
+    public TunnelServer(NetworkHandler networkHandler, Settings settings)
     {
         this.networkHandler = networkHandler;
-        this.connectEndpoint = endPoint;
+        this.connectEndpoint = settings.ipEndpoint;
         networkHandler.SetServer(this);
         networkLoop = new Thread(new ThreadStart(NetworkLoop));
         networkLoop.Start();

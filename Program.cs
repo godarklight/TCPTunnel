@@ -8,28 +8,50 @@ namespace TCPTunnel
     {
         private static bool running;
 
-        static void Main(string[] args)
+        static int Main(string[] args)
         {
-            Settings s = new Settings();
-            s.isServer = false;
-            s.ipEndpoint = "godarklight.info.tm:25560";
-            int listenPort = 0;
+            Settings settings = new Settings();
+            settings.isServer = false;
+            settings.ipEndpointStr = "minecraft1.52k.de:25560";
+            settings.listenPort = 0;
 
-            if (args.Length == 1 && args[0] != "--server")
+            int serverCount = 0;
+            foreach (string arg in args)
             {
-                s.isServer = false;
-                s.ipEndpoint = args[0];
-            }
-
-            if (args.Length == 3 && args[0] == "--server")
-            {
-                s.isServer = true;
-                s.ipEndpoint = args[1];
-                listenPort = Int32.Parse(args[2]);
+                if (serverCount == 2)
+                {
+                    settings.ipEndpointStr = arg;
+                    serverCount--;
+                }
+                if (serverCount == 1)
+                {
+                    settings.listenPort = Int32.Parse(arg);
+                    serverCount--;
+                }
+                if (serverCount > 0)
+                {
+                    serverCount--;
+                    continue;
+                }
+                if (arg == "--server")
+                {
+                    settings.isServer = true;
+                    serverCount = 2;
+                }
+                if (arg == "--ipv6")
+                {
+                    settings.ipv4only = false;
+                    settings.ipv6only = true;
+                }
+                if (arg == "--ipv4")
+                {
+                    settings.ipv4only = true;
+                    settings.ipv6only = false;
+                }
             }
 
             //ParseIPEndpoint
-            string addPart = s.ipEndpoint.Substring(0, s.ipEndpoint.LastIndexOf(":"));
+            string addPart = settings.ipEndpointStr.Substring(0, settings.ipEndpointStr.LastIndexOf(":"));
             //Trim [] parts;
             if (addPart.Contains("["))
             {
@@ -37,27 +59,57 @@ namespace TCPTunnel
             }
             if (!IPAddress.TryParse(addPart, out IPAddress ipAddr))
             {
-                IPAddress[] addrs = Dns.GetHostAddresses(addPart);
-                ipAddr = addrs[0];
+                IPAddress[] addrs = null;
+                try
+                {
+                    addrs = Dns.GetHostAddresses(addPart);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("DNS error: " + e.Message);
+                    return -1;
+                }
                 foreach (IPAddress testIP in addrs)
                 {
-                    if (testIP.AddressFamily == AddressFamily.InterNetwork)
+                    if (!settings.ipv4only && !settings.ipv6only)
+                    {
+                        ipAddr = testIP;
+                        break;
+                    }
+                    if (settings.ipv4only && testIP.AddressFamily == AddressFamily.InterNetwork)
+                    {
+                        ipAddr = testIP;
+                        break;
+                    }
+                    if (settings.ipv6only && testIP.AddressFamily == AddressFamily.InterNetworkV6)
                     {
                         ipAddr = testIP;
                         break;
                     }
                 }
             }
-            string portPart = s.ipEndpoint.Substring(s.ipEndpoint.LastIndexOf(":") + 1);
-            IPEndPoint endPoint = new IPEndPoint(ipAddr, Int32.Parse(portPart));
+
+            if (ipAddr == null)
+            {
+                Console.WriteLine("DNS returned no usable results");
+                return -2;
+            }
+
+            string portPart = settings.ipEndpointStr.Substring(settings.ipEndpointStr.LastIndexOf(":") + 1);
+            settings.ipEndpoint = new IPEndPoint(ipAddr, Int32.Parse(portPart));
+
+            if (settings.listenPort == 0)
+            {
+                settings.listenPort = Int32.Parse(portPart);
+            }
 
             //Init
             running = true;
             NetworkHandler networkHandler = new NetworkHandler();
-            UDPTunnel udpt = new UDPTunnel(networkHandler, listenPort);
-            if (s.isServer)
+            UDPTunnel udpt = new UDPTunnel(networkHandler, settings);
+            if (settings.isServer)
             {
-                TunnelServer ts = new TunnelServer(networkHandler, endPoint);
+                TunnelServer ts = new TunnelServer(networkHandler, settings);
                 Console.WriteLine("Press Ctrl+C key to quit");
                 Console.CancelKeyPress += (object sender, ConsoleCancelEventArgs e) =>
                 {
@@ -69,7 +121,7 @@ namespace TCPTunnel
             }
             else
             {
-                TunnelClient tc = new TunnelClient(networkHandler, endPoint, Int32.Parse(portPart) + 1);
+                TunnelClient tc = new TunnelClient(networkHandler, settings);
                 Console.WriteLine("Press Ctrl+C to quit");
                 Console.CancelKeyPress += (object sender, ConsoleCancelEventArgs e) =>
                 {
@@ -80,6 +132,7 @@ namespace TCPTunnel
                 DisplayMain(networkHandler);
 
             }
+            return 0;
         }
 
         private static void DisplayMain(NetworkHandler networkHandler)

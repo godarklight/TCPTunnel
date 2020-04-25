@@ -4,11 +4,13 @@ using System.Collections.Concurrent;
 
 public class ReliableHandler
 {
+    private long INITIAL_RETRANSMIT = TimeSpan.TicksPerMillisecond * 5;
     private long RETRANSMIT_INTERVAL = TimeSpan.TicksPerMillisecond * 100;
     private long RETRANSMIT_QUEUE = 512 * 1024;
     private int freeSendFragment = 0;
     private Dictionary<int, byte[]> heldMessages = new Dictionary<int, byte[]>();
     private ConcurrentQueue<SendFragment> udpTransmit = new ConcurrentQueue<SendFragment>();
+    private ConcurrentQueue<SendFragment> udpInitialRetransmit = new ConcurrentQueue<SendFragment>();
     private ConcurrentQueue<SendFragment> udpRetransmit = new ConcurrentQueue<SendFragment>();
     public int retransmitBytes = 0;
     private ConcurrentQueue<byte[]> tcpTransmit = new ConcurrentQueue<byte[]>();
@@ -110,8 +112,8 @@ public class ReliableHandler
         {
             if (udpTransmit.TryDequeue(out SendFragment firstDequeueMessage))
             {
-                firstDequeueMessage.nextSendTime = currentTime + RETRANSMIT_INTERVAL;
-                udpRetransmit.Enqueue(firstDequeueMessage);
+                firstDequeueMessage.nextSendTime = currentTime + INITIAL_RETRANSMIT;
+                udpInitialRetransmit.Enqueue(firstDequeueMessage);
                 retransmitBytes += firstDequeueMessage.data.Length;
                 sendSequence = firstDequeueMessage.sequence;
                 sendACK = receiveSequence;
@@ -145,6 +147,32 @@ public class ReliableHandler
                     {
                         retransmitBytes -= dequeueMessage.data.Length;
                     }
+                }
+            }
+            else
+            {
+                //No messages in retransmit queue
+                break;
+            }
+        }
+        //Retransmit initial messages
+        while (true)
+        {
+            if (udpInitialRetransmit.TryPeek(out SendFragment peekMessage))
+            {
+                if (currentTime < peekMessage.nextSendTime)
+                {
+                    //The queue is in order, all messages are waiting to be transmitted
+                    break;
+                }
+                if (udpInitialRetransmit.TryDequeue(out SendFragment dequeueMessage))
+                {
+                    dequeueMessage.nextSendTime = currentTime + RETRANSMIT_INTERVAL;
+                    udpRetransmit.Enqueue(dequeueMessage);
+                    sendSequence = dequeueMessage.sequence;
+                    sendACK = receiveSequence;
+                    sendData = dequeueMessage.data;
+                    return;
                 }
             }
             else
