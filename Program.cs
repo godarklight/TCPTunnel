@@ -21,12 +21,10 @@ namespace TCPTunnel
                 if (serverCount == 2)
                 {
                     settings.ipEndpointStr = arg;
-                    serverCount--;
                 }
                 if (serverCount == 1)
                 {
                     settings.listenPort = Int32.Parse(arg);
-                    serverCount--;
                 }
                 if (serverCount > 0)
                 {

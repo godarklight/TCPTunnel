@@ -103,13 +103,34 @@ public class TunnelClient
             }
             if (disconnectClient != 0)
             {
-                clients.TryRemove(disconnectClient, out TcpClient _);
-                networkHandler.ForgetClient(disconnectClient);
+                DisconnectClient(disconnectClient);
             }
             if (!activity)
             {
                 Thread.Sleep(10);
             }
+        }
+    }
+
+    public void DisconnectClient(int clientID)
+    {
+        if (clients.ContainsKey(clientID))
+        {
+            if (clients.TryRemove(clientID, out TcpClient disconnectTcpClient))
+            {
+                if (disconnectTcpClient.Connected)
+                {
+                    try
+                    {
+                        disconnectTcpClient.Close();
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("Error disconnecting TCP client " + clientID + ", " + e.Message);
+                    }
+                }
+            }
+            networkHandler.ForgetClient(clientID);
         }
     }
 

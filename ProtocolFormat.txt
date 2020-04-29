@@ -1,3 +1,6 @@
 UDP packets:
 4 bytes random connection ID, 4 bytes sequence number, 4 bytes ack number, 4 bytes length, [data, 500 max];
 
+Special sequences:
+-1: ACK Only
+-2: Disconnect and stop sending messages for this client, TCP connection disconnected.

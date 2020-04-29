@@ -33,7 +33,7 @@ public class UDPTunnel
 
     public void ReadLoop()
     {
-        IPEndPoint anyAddr = new IPEndPoint(IPAddress.IPv6Any, 25560);
+        IPEndPoint anyAddr = new IPEndPoint(IPAddress.IPv6Any, 0);
         while (running)
         {
             bool activity = false;

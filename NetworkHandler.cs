@@ -11,6 +11,7 @@ public class NetworkHandler
     private ConcurrentDictionary<int, TcpClient> tcpMappings = new ConcurrentDictionary<int, TcpClient>();
     private ConcurrentDictionary<int, IPEndPoint> udpMappings = new ConcurrentDictionary<int, IPEndPoint>();
     private ConcurrentDictionary<int, long> udpIgnore = new ConcurrentDictionary<int, long>();
+    private ConcurrentQueue<int> udpSendDisconnect = new ConcurrentQueue<int>();
     private ConcurrentDictionary<int, ReliableHandler> reliableHandlers = new ConcurrentDictionary<int, ReliableHandler>();
     private TunnelServer tunnelServer;
     private TunnelClient tunnelClient;
@@ -46,6 +47,14 @@ public class NetworkHandler
         int sequence = ReadInt32(data, 4);
         int ack = ReadInt32(data, 8);
         int dataLength = ReadInt32(data, 12);
+        if (sequence == -2)
+        {
+            if (!udpIgnore.ContainsKey(clientID))
+            {
+                Console.WriteLine("Tunnel connection close for " + clientID);
+                ForgetClient(clientID);
+            }
+        }
         if (length != (16 + dataLength))
         {
             return;
@@ -62,6 +71,7 @@ public class NetworkHandler
             else
             {
                 udpIgnore.TryRemove(clientID, out long _);
+                udpMappings.TryRemove(clientID, out IPEndPoint _2);
             }
         }
         if (!udpMappings.ContainsKey(clientID))
@@ -120,8 +130,18 @@ public class NetworkHandler
     public void ForgetClient(int clientID)
     {
         //Ignore client
-        udpIgnore.TryAdd(clientID, DateTime.UtcNow.Ticks + TimeSpan.TicksPerHour);
+        long currentTime = DateTime.UtcNow.Ticks;
+        udpIgnore.TryAdd(clientID, currentTime + TimeSpan.TicksPerHour);
+        udpSendDisconnect.Enqueue(clientID);
         reliableHandlers.TryRemove(clientID, out ReliableHandler _);
+        if (tunnelClient != null)
+        {
+            tunnelClient.DisconnectClient(clientID);
+        }
+        if (tunnelServer != null)
+        {
+            tunnelServer.DisconnectClient(clientID);
+        }
     }
 
     public bool GetUDPMessage(out byte[] data, out int length, out IPEndPoint endPoint)
@@ -151,6 +171,21 @@ public class NetworkHandler
                     Array.Copy(sendData, 0, sendBuffer, 16, sendData.Length);
                     length = 16 + sendData.Length;
                 }
+                data = sendBuffer;
+                udpBytesSentSecond += length;
+                udpBytesSentTotal += length;
+                return true;
+            }
+        }
+        if (udpSendDisconnect.TryDequeue(out int sendDisconnectClientID))
+        {
+            if (udpMappings.TryGetValue(sendDisconnectClientID, out endPoint))
+            {
+                WriteInt32(sendDisconnectClientID, sendBuffer, 0);
+                WriteInt32(-2, sendBuffer, 4);
+                WriteInt32(-2, sendBuffer, 8);
+                WriteInt32(0, sendBuffer, 12);
+                length = 16;                
                 data = sendBuffer;
                 udpBytesSentSecond += length;
                 udpBytesSentTotal += length;

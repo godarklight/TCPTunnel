@@ -43,7 +43,7 @@ public class TunnelServer
                     }
                     catch (Exception e)
                     {
-                        Console.WriteLine("Error during TCP read: " + e);
+                        Console.WriteLine("Error during TCP read: " + e.Message);
                         disconnectClient = clientID;
                     }
                 }
@@ -59,7 +59,7 @@ public class TunnelServer
                         }
                         catch (Exception e)
                         {
-                            Console.WriteLine("Error during TCP write: " + e);
+                            Console.WriteLine("Error during TCP write: " + e.Message);
                             disconnectClient = clientID;
                         }
                     }
@@ -72,13 +72,34 @@ public class TunnelServer
             }
             if (disconnectClient != 0)
             {
-                clients.TryRemove(disconnectClient, out TcpClient _);
-                networkHandler.ForgetClient(disconnectClient);
+                DisconnectClient(disconnectClient);
             }
             if (!activity)
             {
                 Thread.Sleep(10);
             }
+        }
+    }
+
+    public void DisconnectClient(int clientID)
+    {
+        if (clients.ContainsKey(clientID))
+        {
+            if (clients.TryRemove(clientID, out TcpClient disconnectTcpClient))
+            {
+                if (disconnectTcpClient.Connected)
+                {
+                    try
+                    {
+                        disconnectTcpClient.Close();
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("Error disconnecting TCP client " + clientID + ", " + e.Message);
+                    }
+                }
+            }
+            networkHandler.ForgetClient(clientID);
         }
     }
 
