@@ -57,6 +57,7 @@ public class UDPTunnel
 
     public void WriteLoop()
     {
+        tokenTime = DateTime.UtcNow.Ticks;
         tokens = tokensMax;
         while (running)
         {
